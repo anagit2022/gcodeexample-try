@@ -2,120 +2,226 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>My First G-Code Playground</title>
+    <title>Visual G-Code Blocks Lab</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; margin: 20px; }
-        .container { display: flex; gap: 20px; max-width: 900px; margin: 0 auto; }
-        .pane { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        textarea { width: 100%; height: 300px; font-family: monospace; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; padding: 10px; resize: none; box-sizing: border-box; }
-        canvas { border: 2px solid #333; background: #fafafa; display: block; margin: 0 auto; }
-        button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; }
-        button:hover { background: #0056b3; }
-        h2 { margin-top: 0; color: #333; }
+        body { font-family: system-ui, sans-serif; background: #f0f2f5; margin: 20px; color: #333; }
+        .container { display: flex; gap: 20px; max-width: 1100px; margin: 0 auto; }
+        .pane { flex: 1; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        
+        /* Block Styling */
+        .block-menu { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .block { background: #e3f2fd; border: 2px solid #2196f3; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: space-between; transition: transform 0.1s; }
+        .block:hover { transform: scale(1.02); background: #bbdefb; }
+        
+        .workspace { border: 2px dashed #ccc; border-radius: 8px; min-height: 300px; padding: 10px; background: #fafafa; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 400px; }
+        .active-block { background: #fff; border: 2px solid #4caf50; padding: 10px; border-radius: 6px; display: flex; gap: 10px; align-items: center; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .active-block.setup { border-color: #ff9800; background: #fffde7; }
+        .active-block.curve { border-color: #9c27b0; background: #f3e5f5; }
+        
+        input[type="number"] { width: 50px; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; text-align: center; }
+        .delete-btn { background: #ff5252; color: white; border: none; border-radius: 4px; padding: 2px 8px; cursor: pointer; margin-left: auto; }
+        
+        canvas { border: 2px solid #333; background: #ffffff; display: block; margin: 0 auto; border-radius: 8px; }
+        pre { background: #272822; color: #f8f8f2; padding: 15px; border-radius: 8px; font-family: monospace; overflow-x: auto; height: 180px; margin: 10px 0 0 0; box-sizing: border-box;}
+        button.download { background: #4caf50; color: white; border: none; padding: 12px; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        button.download:hover { background: #388e3c; }
+        h2 { margin-top: 0; font-size: 18px; border-bottom: 2px solid #eee; padding-bottom: 8px; }
     </style>
 </head>
 <body>
 
-<h1 style="text-align: center; color: #222;">🚀 G-Code Learning Lab</h1>
+<h1 style="text-align: center; margin-bottom: 30px;">🧩 Scratch-Style G-Code Lab</h1>
 
 <div class="container">
     <div class="pane">
-        <h2>1. Write G-Code</h2>
-        <textarea id="gcodeEditor">; Try changing the numbers below!
-G28 ; Home
-G1 X50 Y50 F3000 ; Move to start
-G1 X150 Y50 E10  ; Draw line 1
-G1 X150 Y150 E20 ; Draw line 2
-G1 X50 Y150 E30  ; Draw line 3
-G1 X50 Y50 E40   ; Draw line 4</textarea>
-        <button onclick="downloadGCode()">💾 Download .gcode File</button>
+        <h2>1. Click Blocks to Add</h2>
+        <div class="block-menu">
+            <div class="block" style="border-color:#ff9800; background:#fff3e0;" onclick="addBlock('setup')">
+                <span>🚀 Start, Heat & Home</span>
+                <span style="font-size:12px; color:#e65100;">(Warms up nozzle to 200°C)</span>
+            </div>
+            <div class="block" style="border-color:#2196f3; background:#e3f2fd;" onclick="addBlock('line')">
+                <span>✏️ Draw Straight Line</span>
+                <span style="font-size:12px; color:#0d47a1;">(Moves nozzle while printing)</span>
+            </div>
+            <div class="block" style="border-color:#9c27b0; background:#f3e5f5;" onclick="addBlock('curve')">
+                <span>🔄 Draw Clockwise Curve</span>
+                <span style="font-size:12px; color:#4a148c;">(Creates round arcs)</span>
+            </div>
+        </div>
+
+        <h2>2. Your Program Chain</h2>
+        <div class="workspace" id="workspace">
+            </div>
     </div>
 
     <div class="pane">
-        <h2>2. Live Robot Preview</h2>
+        <h2>3. Live Robot Preview (200x200mm Bed)</h2>
         <canvas id="previewCanvas" width="300" height="300"></canvas>
+        
+        <h2>4. Generated G-Code</h2>
+        <pre id="gcodeOutput">; Your code will appear here...</pre>
+        <button class="download" onclick="downloadGCode()">💾 Download .gcode File</button>
     </div>
 </div>
 
 <script>
     const canvas = document.getElementById('previewCanvas');
     const ctx = canvas.getContext('2d');
-    const editor = document.getElementById('gcodeEditor');
+    const workspace = document.getElementById('workspace');
+    const gcodeOutput = document.getElementById('gcodeOutput');
 
-    // Automatically update the simulation when the user types!
-    editor.addEventListener('input', drawSimulation);
+    let blockSequence = [];
+    let blockIdCounter = 0;
 
-    function drawSimulation() {
-        // Clear the canvas and draw a grid
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawGrid();
+    // Add a default setup block to start things off nicely!
+    addBlock('setup');
 
-        const lines = editor.value.split('\n');
-        let currentX = 0;
-        let currentY = 0;
+    function addBlock(type) {
+        let blockData = { id: blockIdCounter++, type: type };
+        
+        if (type === 'line') {
+            blockData.x = 100; blockData.y = 100;
+        } else if (type === 'curve') {
+            blockData.x = 100; blockData.y = 50; blockData.i = 0; blockData.j = 25;
+        }
+        
+        blockSequence.push(blockData);
+        renderWorkspace();
+        updateSimulation();
+    }
 
-        ctx.strokeStyle = '#ff5722'; // Extrusion color (Orange)
-        ctx.lineWidth = 3;
-        ctx.beginPath();
+    function removeBlock(id) {
+        blockSequence = blockSequence.filter(b => b.id !== id);
+        renderWorkspace();
+        updateSimulation();
+    }
 
-        lines.forEach(line => {
-            // Clean up the line by removing comments
-            const cleanLine = line.split(';')[0].toUpperCase().trim();
+    function updateBlockValue(id, key, value) {
+        let block = blockSequence.find(b => b.id === id);
+        if (block) {
+            block[key] = parseFloat(value) || 0;
+            updateSimulation();
+        }
+    }
+
+    function renderWorkspace() {
+        workspace.innerHTML = '';
+        if (blockSequence.length === 0) {
+            workspace.innerHTML = '<div style="color:#aaa; text-align:center; margin-top:100px;">Chain is empty. Click a block above!</div>';
+            return;
+        }
+
+        blockSequence.forEach(block => {
+            const div = document.createElement('div');
+            div.className = `active-block ${block.type}`;
             
-            if (cleanLine.startsWith('G28')) {
-                // Home goes back to 0,0
-                currentX = 0;
-                currentY = 0;
-                ctx.moveTo(0, canvas.height); // Canvas 0,0 is top-left, so we invert Y
+            if (block.type === 'setup') {
+                div.innerHTML = `⚙️ <b>Start Code</b> (Heats to 200°C, Homes Printer)`;
             } 
-            else if (cleanLine.startsWith('G1')) {
-                // Look for X and Y coordinates using Regular Expressions
-                const xMatch = cleanLine.match(/X([\d.]+)/);
-                const yMatch = cleanLine.match(/Y([\d.]+)/);
-                const hasExtrusion = cleanLine.includes('E');
-
-                if (xMatch) currentX = parseFloat(xMatch[1]);
-                if (yMatch) currentY = parseFloat(yMatch[1]);
-
-                // Map printer coordinates (e.g., 0-200) to our 300x300 canvas pixels
-                const targetX = (currentX / 200) * canvas.width;
-                const targetY = canvas.height - ((currentY / 200) * canvas.height);
-
-                if (hasExtrusion) {
-                    ctx.lineTo(targetX, targetY);
-                    ctx.stroke();
-                } else {
-                    ctx.moveTo(targetX, targetY);
-                }
+            else if (block.type === 'line') {
+                div.innerHTML = `✏️ <b>Line to:</b> 
+                    X <input type="number" value="${block.x}" oninput="updateBlockValue(${block.id}, 'x', this.value)"> 
+                    Y <input type="number" value="${block.y}" oninput="updateBlockValue(${block.id}, 'y', this.value)">`;
+            } 
+            else if (block.type === 'curve') {
+                div.innerHTML = `🔄 <b>Curve to:</b> 
+                    X <input type="number" value="${block.x}" oninput="updateBlockValue(${block.id}, 'x', this.value)"> 
+                    Y <input type="number" value="${block.y}" oninput="updateBlockValue(${block.id}, 'y', this.value)"> 
+                    | <b>Center offset:</b> 
+                    I <input type="number" value="${block.i}" oninput="updateBlockValue(${block.id}, 'i', this.value)"> 
+                    J <input type="number" value="${block.j}" oninput="updateBlockValue(${block.id}, 'j', this.value)">`;
             }
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'delete-btn';
+            delBtn.innerText = '✕';
+            delBtn.onclick = () => removeBlock(block.id);
+            div.appendChild(delBtn);
+            
+            workspace.appendChild(div);
         });
     }
 
+    function updateSimulation() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGrid();
+
+        let currentX = 0;
+        let currentY = 0;
+        let totalExtrusion = 0;
+        let gcodeLines = [];
+
+        ctx.strokeStyle = '#ff5722';
+        ctx.lineWidth = 3;
+
+        blockSequence.forEach(block => {
+            if (block.type === 'setup') {
+                gcodeLines.push("M140 S60         ; Heat bed to 60C");
+                gcodeLines.push("M104 S200        ; Heat nozzle to 200C");
+                gcodeLines.push("M109 S200        ; Wait for heat");
+                gcodeLines.push("G28              ; Home all axes");
+                gcodeLines.push("G90              ; Absolute positioning");
+                currentX = 0; currentY = 0;
+            } 
+            else if (block.type === 'line') {
+                totalExtrusion += 5; // Fake extrusion accumulation
+                gcodeLines.push(`G1 X${block.x} Y${block.y} E${totalExtrusion} F1200`);
+
+                ctx.beginPath();
+                ctx.moveTo((currentX / 200) * canvas.width, canvas.height - ((currentY / 200) * canvas.height));
+                ctx.lineTo((block.x / 200) * canvas.width, canvas.height - ((block.y / 200) * canvas.height));
+                ctx.stroke();
+
+                currentX = block.x; currentY = block.y;
+            } 
+            else if (block.type === 'curve') {
+                totalExtrusion += 8;
+                gcodeLines.push(`G2 X${block.x} Y${block.y} I${block.i} J${block.j} E${totalExtrusion}`);
+
+                let centerX = currentX + block.i;
+                let centerY = currentY + block.j;
+                let radius = Math.sqrt(block.i * block.i + block.j * block.j);
+                let startAngle = Math.atan2(currentY - centerY, currentX - centerX);
+                let endAngle = Math.atan2(block.y - centerY, block.x - centerX);
+
+                ctx.beginPath();
+                ctx.arc(
+                    (centerX / 200) * canvas.width,
+                    canvas.height - ((centerY / 200) * canvas.height),
+                    (radius / 200) * canvas.width,
+                    -startAngle, -endAngle,
+                    true // Clockwise
+                );
+                ctx.stroke();
+
+                currentX = block.x; currentY = block.y;
+            }
+        });
+
+        gcodeOutput.innerText = gcodeLines.length > 0 ? gcodeLines.join('\n') : "; Click blocks to generate code!";
+    }
+
     function drawGrid() {
-        ctx.strokeStyle = '#ddd';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
         for (let i = 0; i <= canvas.width; i += 30) {
-            // Vertical lines
             ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
-            // Horizontal lines
             ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
         }
     }
 
-    // Function to handle downloading the text as a real file
     function downloadGCode() {
-        const text = editor.value;
+        const text = gcodeOutput.innerText;
         const blob = new Blob([text], { type: 'text/plain' });
         const element = document.createElement('a');
         element.href = URL.createObjectURL(blob);
-        element.download = "my_hand_coded_shape.gcode";
+        element.download = "block_printed_shape.gcode";
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
     }
 
-    // Run the simulation right away on load
-    drawSimulation();
+    updateSimulation();
 </script>
 
 </body>
