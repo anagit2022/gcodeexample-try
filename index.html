@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My First G-Code Playground</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; margin: 20px; }
+        .container { display: flex; gap: 20px; max-width: 900px; margin: 0 auto; }
+        .pane { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        textarea { width: 100%; height: 300px; font-family: monospace; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; padding: 10px; resize: none; box-sizing: border-box; }
+        canvas { border: 2px solid #333; background: #fafafa; display: block; margin: 0 auto; }
+        button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; }
+        button:hover { background: #0056b3; }
+        h2 { margin-top: 0; color: #333; }
+    </style>
+</head>
+<body>
+
+<h1 style="text-align: center; color: #222;">🚀 G-Code Learning Lab</h1>
+
+<div class="container">
+    <div class="pane">
+        <h2>1. Write G-Code</h2>
+        <textarea id="gcodeEditor">; Try changing the numbers below!
+G28 ; Home
+G1 X50 Y50 F3000 ; Move to start
+G1 X150 Y50 E10  ; Draw line 1
+G1 X150 Y150 E20 ; Draw line 2
+G1 X50 Y150 E30  ; Draw line 3
+G1 X50 Y50 E40   ; Draw line 4</textarea>
+        <button onclick="downloadGCode()">💾 Download .gcode File</button>
+    </div>
+
+    <div class="pane">
+        <h2>2. Live Robot Preview</h2>
+        <canvas id="previewCanvas" width="300" height="300"></canvas>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('previewCanvas');
+    const ctx = canvas.getContext('2d');
+    const editor = document.getElementById('gcodeEditor');
+
+    // Automatically update the simulation when the user types!
+    editor.addEventListener('input', drawSimulation);
+
+    function drawSimulation() {
+        // Clear the canvas and draw a grid
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGrid();
+
+        const lines = editor.value.split('\n');
+        let currentX = 0;
+        let currentY = 0;
+
+        ctx.strokeStyle = '#ff5722'; // Extrusion color (Orange)
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+
+        lines.forEach(line => {
+            // Clean up the line by removing comments
+            const cleanLine = line.split(';')[0].toUpperCase().trim();
+            
+            if (cleanLine.startsWith('G28')) {
+                // Home goes back to 0,0
+                currentX = 0;
+                currentY = 0;
+                ctx.moveTo(0, canvas.height); // Canvas 0,0 is top-left, so we invert Y
+            } 
+            else if (cleanLine.startsWith('G1')) {
+                // Look for X and Y coordinates using Regular Expressions
+                const xMatch = cleanLine.match(/X([\d.]+)/);
+                const yMatch = cleanLine.match(/Y([\d.]+)/);
+                const hasExtrusion = cleanLine.includes('E');
+
+                if (xMatch) currentX = parseFloat(xMatch[1]);
+                if (yMatch) currentY = parseFloat(yMatch[1]);
+
+                // Map printer coordinates (e.g., 0-200) to our 300x300 canvas pixels
+                const targetX = (currentX / 200) * canvas.width;
+                const targetY = canvas.height - ((currentY / 200) * canvas.height);
+
+                if (hasExtrusion) {
+                    ctx.lineTo(targetX, targetY);
+                    ctx.stroke();
+                } else {
+                    ctx.moveTo(targetX, targetY);
+                }
+            }
+        });
+    }
+
+    function drawGrid() {
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= canvas.width; i += 30) {
+            // Vertical lines
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            // Horizontal lines
+            ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+        }
+    }
+
+    // Function to handle downloading the text as a real file
+    function downloadGCode() {
+        const text = editor.value;
+        const blob = new Blob([text], { type: 'text/plain' });
+        const element = document.createElement('a');
+        element.href = URL.createObjectURL(blob);
+        element.download = "my_hand_coded_shape.gcode";
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    }
+
+    // Run the simulation right away on load
+    drawSimulation();
+</script>
+
+</body>
+</html>
